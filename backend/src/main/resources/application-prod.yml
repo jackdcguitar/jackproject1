@@ -1,0 +1,69 @@
+# ==========================================
+# 生產環境配置檔案
+# 用途：生產環境專用的配置，覆蓋 application.yml 中的設定
+# 注意：實際部署時應使用環境變數或配置中心管理敏感資訊
+# ==========================================
+
+# 伺服器配置
+server:
+  port: 8080  # 生產環境埠
+
+# Spring 配置
+spring:
+  # 資料庫配置 - 生產環境（建議使用環境變數）
+  datasource:
+    url: ${DB_URL:jdbc:mysql://prod-db-server:3306/mall_db?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=Asia/Taipei}
+    username: ${DB_USERNAME:mall_user}
+    password: ${DB_PASSWORD:change_this_password}
+
+    # Druid 連接池 - 生產環境優化
+    druid:
+      initial-size: 10
+      min-idle: 10
+      max-active: 50
+      max-wait: 60000
+
+      # 生產環境關閉監控頁面
+      stat-view-servlet:
+        enabled: false
+
+  # Redis 配置 - 生產環境
+  data:
+    redis:
+      host: ${REDIS_HOST:prod-redis-server}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+
+# JWT 配置 - 生產環境（建議使用環境變數）
+jwt:
+  secret: ${JWT_SECRET:please-change-this-secret-in-production-environment}
+  expiration: 604800000
+
+# 阿里雲 OSS - 生產環境
+aliyun:
+  oss:
+    endpoint: ${OSS_ENDPOINT:oss-cn-taipei.aliyuncs.com}
+    access-key-id: ${OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+    bucket-name: ${OSS_BUCKET_NAME:mall-prod-images}
+
+# Knife4j - 生產環境關閉文檔
+knife4j:
+  enable: false  # 生產環境禁用 API 文檔
+  production: true
+
+# 日誌配置 - 生產環境
+logging:
+  level:
+    com.jackproject.mall: info  # 專案日誌：資訊級別
+    org.springframework: warn  # Spring 框架：警告級別
+  file:
+    name: /var/log/mall/backend.log  # 生產環境日誌路徑
+    max-size: 50MB
+    max-history: 90  # 保留 90 天

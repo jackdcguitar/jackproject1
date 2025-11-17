@@ -1,0 +1,35 @@
+# ==========================================
+# 開發環境配置檔案
+# 用途：開發環境專用的配置，覆蓋 application.yml 中的設定
+# ==========================================
+
+# 伺服器配置
+server:
+  port: 8080  # 開發環境埠
+
+# Spring 配置
+spring:
+  # 資料庫配置 - 開發環境
+  datasource:
+    url: jdbc:mysql://localhost:3306/mall_db_dev?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Taipei
+    username: root
+    password: 123456
+
+  # Redis 配置 - 開發環境
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+
+# 日誌配置 - 開發環境更詳細的日誌
+logging:
+  level:
+    com.jackproject.mall: debug  # 專案日誌：除錯級別
+    org.springframework.web: debug  # Spring Web 日誌
+    org.springframework.security: debug  # Spring Security 日誌
+
+# Knife4j - 開發環境啟用
+knife4j:
+  enable: true
+  production: false  # 開發環境不禁用文檔

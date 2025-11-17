@@ -1,0 +1,167 @@
+# ==========================================
+# Spring Boot 應用程式主配置檔案
+# 用途：配置應用的基本設定、資料庫連接、Redis、JWT等
+# ==========================================
+
+# 伺服器配置
+server:
+  port: 8080  # 後端服務埠號
+  servlet:
+    context-path: /api  # API 根路徑前綴
+    encoding:
+      charset: UTF-8  # 字元編碼
+      enabled: true
+      force: true
+
+# Spring 框架配置
+spring:
+  # 應用程式基本資訊
+  application:
+    name: mall-backend  # 應用名稱
+
+  # 環境配置
+  profiles:
+    active: dev  # 啟用的環境配置（dev: 開發環境, prod: 生產環境）
+
+  # 資料庫配置 - 使用 MySQL
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource  # 使用 Druid 連接池
+    driver-class-name: com.mysql.cj.jdbc.Driver  # MySQL 8.x 驅動
+    url: jdbc:mysql://localhost:3306/mall_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Taipei
+    username: root  # 資料庫用戶名
+    password: 123456  # 資料庫密碼
+
+    # Druid 連接池配置
+    druid:
+      initial-size: 5  # 初始連接數
+      min-idle: 5  # 最小空閒連接數
+      max-active: 20  # 最大活躍連接數
+      max-wait: 60000  # 獲取連接等待超時時間（毫秒）
+      time-between-eviction-runs-millis: 60000  # 連接回收器運行間隔時間
+      min-evictable-idle-time-millis: 300000  # 連接最小空閒時間
+      validation-query: SELECT 1  # 驗證連接是否有效的 SQL
+      test-while-idle: true  # 空閒時測試連接
+      test-on-borrow: false  # 取得連接時測試
+      test-on-return: false  # 歸還連接時測試
+
+      # Druid 監控配置
+      stat-view-servlet:
+        enabled: true  # 啟用 Druid 監控頁面
+        url-pattern: /druid/*  # 監控頁面路徑
+        login-username: admin  # 監控頁面登入帳號
+        login-password: admin123  # 監控頁面登入密碼
+
+      # 監控統計配置
+      filter:
+        stat:
+          enabled: true  # 啟用 SQL 監控
+          log-slow-sql: true  # 記錄慢 SQL
+          slow-sql-millis: 1000  # 慢 SQL 閾值（毫秒）
+        wall:
+          enabled: true  # 啟用防火牆（SQL 注入防護）
+
+  # Redis 配置 - 用於快取和 Session 管理
+  data:
+    redis:
+      host: localhost  # Redis 伺服器位址
+      port: 6379  # Redis 埠
+      password:   # Redis 密碼（如果有設定）
+      database: 0  # 使用的資料庫索引
+      timeout: 5000  # 連接超時時間（毫秒）
+      lettuce:
+        pool:
+          max-active: 8  # 最大活躍連接數
+          max-idle: 8  # 最大空閒連接數
+          min-idle: 0  # 最小空閒連接數
+          max-wait: -1  # 最大等待時間（-1 表示無限制）
+
+  # 檔案上傳配置
+  servlet:
+    multipart:
+      enabled: true  # 啟用檔案上傳
+      max-file-size: 10MB  # 單個檔案最大大小
+      max-request-size: 50MB  # 請求最大大小
+
+  # Jackson JSON 配置
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss  # 日期格式
+    time-zone: GMT+8  # 時區設定（台灣時區）
+    serialization:
+      write-dates-as-timestamps: false  # 不將日期序列化為時間戳
+    default-property-inclusion: non_null  # 序列化時忽略 null 值
+
+# MyBatis Plus 配置 - 用於資料庫 ORM 操作
+mybatis-plus:
+  # Mapper XML 檔案位置
+  mapper-locations: classpath:mapper/**/*.xml
+
+  # 實體類掃描路徑
+  type-aliases-package: com.jackproject.mall.entity
+
+  # 全域配置
+  global-config:
+    db-config:
+      id-type: auto  # 主鍵類型：自動增長
+      table-prefix: t_  # 資料表前綴
+      logic-delete-field: deleted  # 邏輯刪除欄位
+      logic-delete-value: 1  # 邏輯刪除值
+      logic-not-delete-value: 0  # 邏輯未刪除值
+
+    # 是否列印 Banner
+    banner: false
+
+  # 配置
+  configuration:
+    map-underscore-to-camel-case: true  # 開啟駝峰命名轉換
+    cache-enabled: false  # 關閉二級快取
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 日誌實現
+
+# JWT 配置 - 用於用戶認證
+jwt:
+  secret: jackproject-mall-secret-key-2024-very-long-and-secure  # JWT 密鑰（至少 256 位元）
+  expiration: 604800000  # Token 有效期（毫秒，這裡是 7 天）
+  header: Authorization  # HTTP 請求頭名稱
+  token-prefix: Bearer   # Token 前綴
+
+# 阿里雲 OSS 配置 - 用於檔案儲存
+aliyun:
+  oss:
+    endpoint: oss-cn-taipei.aliyuncs.com  # OSS 端點（台灣節點）
+    access-key-id: your-access-key-id  # AccessKey ID
+    access-key-secret: your-access-key-secret  # AccessKey Secret
+    bucket-name: mall-images  # Bucket 名稱
+    url-prefix: https://mall-images.oss-cn-taipei.aliyuncs.com/  # 檔案訪問 URL 前綴
+
+# Knife4j API 文檔配置
+knife4j:
+  enable: true  # 啟用 Knife4j
+  setting:
+    language: zh_TW  # 介面語言：繁體中文
+  production: false  # 生產環境是否禁用（false 表示不禁用）
+
+# 日誌配置
+logging:
+  level:
+    com.jackproject.mall: debug  # 專案日誌級別
+    org.springframework: info  # Spring 框架日誌級別
+    com.baomidou.mybatisplus: debug  # MyBatis Plus 日誌級別
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{50} - %msg%n'  # 控制台日誌格式
+  file:
+    name: logs/mall-backend.log  # 日誌檔案路徑
+    max-size: 10MB  # 單個日誌檔案最大大小
+    max-history: 30  # 保留日誌檔案天數
+
+# 應用程式自定義配置
+app:
+  # 跨域配置
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:8081  # 允許的前端來源
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS  # 允許的 HTTP 方法
+    allowed-headers: '*'  # 允許的請求頭
+    allow-credentials: true  # 是否允許攜帶憑證
+
+  # 分頁配置
+  page:
+    default-page-size: 10  # 預設每頁記錄數
+    max-page-size: 100  # 最大每頁記錄數

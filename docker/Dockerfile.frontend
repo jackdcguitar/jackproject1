@@ -1,0 +1,65 @@
+# ==========================================
+# 商城系統前端 Dockerfile
+# 技術：Docker 容器化 + Nginx
+# 構建工具：Node.js + Vite
+# Web 伺服器：Nginx
+# ==========================================
+
+# ========== 第一階段：構建階段 ==========
+# 使用 Node.js 鏡像構建專案
+FROM node:20-alpine AS builder
+
+# 設定工作目錄
+WORKDIR /app
+
+# 複製 package.json 和 package-lock.json（利用 Docker 層快取）
+COPY frontend/package*.json ./
+
+# 安裝專案依賴
+# 使用淘寶鏡像加速（可選）
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install
+
+# 複製專案原始碼
+COPY frontend/ ./
+
+# 構建生產版本
+# 產生靜態檔案到 dist 目錄
+RUN npm run build
+
+# ========== 第二階段：運行階段 ==========
+# 使用 Nginx 鏡像提供靜態檔案服務
+FROM nginx:1.25-alpine
+
+# 複製自訂的 Nginx 配置
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+# 從構建階段複製構建好的靜態檔案
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# 建立 Nginx 快取目錄
+RUN mkdir -p /var/cache/nginx/client_temp
+
+# 設定檔案權限
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx
+
+# 暴露埠號（HTTP 預設 80）
+EXPOSE 80
+
+# 健康檢查
+# 檢查 Nginx 是否正常運行
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+
+# 啟動 Nginx
+# daemon off 讓 Nginx 在前台運行（Docker 容器需要）
+CMD ["nginx", "-g", "daemon off;"]
+
+# ==========================================
+# 構建指令：
+# docker build -f docker/Dockerfile.frontend -t mall-frontend:latest .
+#
+# 運行指令：
+# docker run -d -p 80:80 --name mall-frontend mall-frontend:latest
+# ==========================================

@@ -1,0 +1,76 @@
+# ==========================================
+# 商城系統後端 Dockerfile
+# 技術：Docker 容器化
+# 基礎鏡像：OpenJDK 17
+# 構建工具：Maven
+# ==========================================
+
+# ========== 第一階段：構建階段 ==========
+# 使用 Maven 鏡像構建專案
+FROM maven:3.9-eclipse-temurin-17 AS builder
+
+# 設定工作目錄
+WORKDIR /app
+
+# 複製 pom.xml 檔案（利用 Docker 層快取）
+# 只有 pom.xml 變更時才重新下載依賴
+COPY backend/pom.xml .
+
+# 下載專案依賴（利用快取）
+RUN mvn dependency:go-offline -B
+
+# 複製專案原始碼
+COPY backend/src ./src
+
+# 構建專案（跳過測試以加快構建速度）
+# 產生可執行的 jar 檔案
+RUN mvn clean package -DskipTests
+
+# ========== 第二階段：運行階段 ==========
+# 使用更小的 JRE 鏡像運行應用
+FROM eclipse-temurin:17-jre-alpine
+
+# 安裝時區資料（解決時區問題）
+RUN apk add --no-cache tzdata
+
+# 設定時區為台北時間
+ENV TZ=Asia/Taipei
+
+# 建立應用目錄
+WORKDIR /app
+
+# 從構建階段複製 jar 檔案
+COPY --from=builder /app/target/*.jar app.jar
+
+# 建立日誌目錄
+RUN mkdir -p /var/log/mall
+
+# 暴露埠號（Spring Boot 預設 8080）
+EXPOSE 8080
+
+# JVM 參數優化
+# -Xms：初始堆記憶體大小
+# -Xmx：最大堆記憶體大小
+# -XX:+UseG1GC：使用 G1 垃圾回收器
+# -XX:MaxGCPauseMillis：最大 GC 停頓時間
+# -Djava.security.egd：加快隨機數生成
+ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.security.egd=file:/dev/./urandom"
+
+# 健康檢查
+# 每 30 秒檢查一次應用是否正常運行
+# 超時時間 10 秒
+# 重試次數 3 次
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1
+
+# 啟動應用
+# 使用 exec 格式確保信號能正確傳遞
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+
+# ==========================================
+# 構建指令：
+# docker build -f docker/Dockerfile.backend -t mall-backend:latest .
+#
+# 運行指令：
+# docker run -d -p 8080:8080 --name mall-backend mall-backend:latest
+# ==========================================

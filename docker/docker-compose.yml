@@ -1,0 +1,231 @@
+# ==========================================
+# Docker Compose 配置檔案
+# 技術：Docker Compose
+# 用途：一鍵啟動所有服務（前端、後端、資料庫、Redis）
+# 版本：3.8
+# ==========================================
+
+version: '3.8'
+
+# ==================== 服務定義 ====================
+services:
+  # ==================== MySQL 資料庫 ====================
+  mysql:
+    # 使用 MySQL 8.0 鏡像
+    image: mysql:8.0
+    container_name: mall-mysql
+    restart: always
+
+    # 環境變數配置
+    environment:
+      # Root 密碼
+      MYSQL_ROOT_PASSWORD: root123456
+      # 建立資料庫
+      MYSQL_DATABASE: mall_db
+      # 建立用戶
+      MYSQL_USER: mall_user
+      # 用戶密碼
+      MYSQL_PASSWORD: mall_pass123
+      # 時區設定
+      TZ: Asia/Taipei
+
+    # 埠映射（主機埠:容器埠）
+    # 外部可通過 localhost:3306 連接
+    ports:
+      - "3306:3306"
+
+    # 資料卷掛載（持久化資料）
+    volumes:
+      # MySQL 資料目錄（持久化）
+      - mysql-data:/var/lib/mysql
+      # MySQL 配置檔案
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+      # 初始化 SQL 腳本（自動執行）
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ../database/init-data.sql:/docker-entrypoint-initdb.d/2-init-data.sql
+
+    # 自訂命令（設定字元集）
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+
+    # 健康檢查
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    # 網路
+    networks:
+      - mall-network
+
+  # ==================== Redis 快取 ====================
+  redis:
+    # 使用 Redis 7 Alpine 鏡像（更小）
+    image: redis:7-alpine
+    container_name: mall-redis
+    restart: always
+
+    # 環境變數
+    environment:
+      TZ: Asia/Taipei
+
+    # 埠映射
+    ports:
+      - "6379:6379"
+
+    # 資料卷掛載
+    volumes:
+      # Redis 資料目錄（持久化）
+      - redis-data:/data
+      # Redis 配置檔案（可選）
+      # - ./redis/redis.conf:/etc/redis/redis.conf
+
+    # 啟動命令（啟用持久化）
+    command: redis-server --appendonly yes
+
+    # 健康檢查
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    # 網路
+    networks:
+      - mall-network
+
+  # ==================== 後端服務 ====================
+  backend:
+    # 使用本地 Dockerfile 構建
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    image: mall-backend:latest
+    container_name: mall-backend
+    restart: always
+
+    # 環境變數（覆蓋 application.yml 配置）
+    environment:
+      # Spring Profile
+      SPRING_PROFILES_ACTIVE: prod
+      # 資料庫配置
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/mall_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Taipei
+      SPRING_DATASOURCE_USERNAME: mall_user
+      SPRING_DATASOURCE_PASSWORD: mall_pass123
+      # Redis 配置
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      # JWT 密鑰（生產環境應使用更複雜的密鑰）
+      JWT_SECRET: production-jwt-secret-key-change-this-in-real-deployment
+      # 時區
+      TZ: Asia/Taipei
+
+    # 埠映射
+    ports:
+      - "8080:8080"
+
+    # 資料卷掛載
+    volumes:
+      # 日誌目錄
+      - backend-logs:/var/log/mall
+
+    # 依賴服務（等待 MySQL 和 Redis 啟動）
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    # 健康檢查
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # 網路
+    networks:
+      - mall-network
+
+  # ==================== 前端服務 ====================
+  frontend:
+    # 使用本地 Dockerfile 構建
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    image: mall-frontend:latest
+    container_name: mall-frontend
+    restart: always
+
+    # 環境變數
+    environment:
+      TZ: Asia/Taipei
+
+    # 埠映射（HTTP 80 埠）
+    ports:
+      - "80:80"
+
+    # 依賴後端服務
+    depends_on:
+      - backend
+
+    # 健康檢查
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    # 網路
+    networks:
+      - mall-network
+
+# ==================== 資料卷定義 ====================
+# 用於持久化資料，即使容器刪除資料也不會丟失
+volumes:
+  # MySQL 資料
+  mysql-data:
+    driver: local
+  # Redis 資料
+  redis-data:
+    driver: local
+  # 後端日誌
+  backend-logs:
+    driver: local
+
+# ==================== 網路定義 ====================
+# 建立自訂網路，讓所有服務可以互相通訊
+networks:
+  mall-network:
+    driver: bridge
+
+# ==========================================
+# 使用說明：
+#
+# 1. 啟動所有服務：
+#    docker-compose -f docker/docker-compose.yml up -d
+#
+# 2. 查看服務狀態：
+#    docker-compose -f docker/docker-compose.yml ps
+#
+# 3. 查看日誌：
+#    docker-compose -f docker/docker-compose.yml logs -f [服務名]
+#
+# 4. 停止所有服務：
+#    docker-compose -f docker/docker-compose.yml down
+#
+# 5. 停止並刪除資料卷：
+#    docker-compose -f docker/docker-compose.yml down -v
+#
+# 6. 重新構建並啟動：
+#    docker-compose -f docker/docker-compose.yml up -d --build
+#
+# 訪問地址：
+# - 前端：http://localhost
+# - 後端 API：http://localhost:8080/api
+# - API 文檔：http://localhost:8080/api/doc.html
+# ==========================================

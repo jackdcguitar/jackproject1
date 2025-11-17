@@ -1,0 +1,220 @@
+# ==========================================
+# Git 忽略檔案配置
+# 用途：指定不需要提交到 Git 的檔案和目錄
+# ==========================================
+
+# ==================== Java / Spring Boot ====================
+
+# Maven
+backend/target/
+backend/pom.xml.tag
+backend/pom.xml.releaseBackup
+backend/pom.xml.versionsBackup
+backend/pom.xml.next
+backend/release.properties
+backend/dependency-reduced-pom.xml
+backend/buildNumber.properties
+backend/.mvn/timing.properties
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+backend/.gradle/
+backend/build/
+backend/!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ IDEA
+backend/.idea/
+backend/*.iws
+backend/*.iml
+backend/*.ipr
+backend/out/
+
+# Eclipse
+backend/.apt_generated/
+backend/.classpath
+backend/.factorypath
+backend/.project
+backend/.settings/
+backend/.springBeans
+backend/.sts4-cache/
+backend/bin/
+
+# NetBeans
+backend/nbproject/private/
+backend/nbbuild/
+backend/dist/
+backend/nbdist/
+backend/.nb-gradle/
+
+# VS Code
+backend/.vscode/
+
+# 日誌檔案
+backend/*.log
+backend/logs/
+backend/spring.log
+
+# 臨時檔案
+backend/tmp/
+backend/*.tmp
+
+# ==================== Node.js / Vue ====================
+
+# 依賴目錄
+frontend/node_modules/
+frontend/jspm_packages/
+
+# 建構輸出
+frontend/dist/
+frontend/dist-ssr/
+frontend/build/
+
+# 環境變數
+frontend/.env.local
+frontend/.env.*.local
+frontend/.env.production
+
+# 日誌檔案
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+
+# IDE
+frontend/.idea/
+frontend/.vscode/
+frontend/*.suo
+frontend/*.ntvs*
+frontend/*.njsproj
+frontend/*.sln
+frontend/*.sw?
+
+# 測試覆蓋率
+frontend/coverage/
+frontend/.nyc_output/
+
+# Vite
+frontend/.vite/
+
+# TypeScript
+frontend/*.tsbuildinfo
+
+# ==================== 資料庫 ====================
+
+# MySQL 資料檔案
+*.sql.backup
+*.sql.bak
+database/backup/
+
+# ==================== Docker ====================
+
+# Docker 資料卷（如果在專案目錄下）
+docker/volumes/
+docker/data/
+
+# ==================== 作業系統 ====================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ==================== 編輯器 ====================
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw[a-p]
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# ==================== 其他 ====================
+
+# 壓縮檔案
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# 敏感資訊（重要！）
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+secrets/
+.env.secret
+config/secrets.yml
+
+# 備份檔案
+*.bak
+*.backup
+*.old
+
+# 臨時檔案
+*.cache
+*.pid
+*.seed
+*.pid.lock
+
+# 文檔草稿
+*.draft.md
+TODO.md
+NOTES.md
