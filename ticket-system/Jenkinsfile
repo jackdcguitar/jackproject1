@@ -1,0 +1,379 @@
+#!/usr/bin/env groovy
+
+/**
+ * Jenkins CI/CD Pipeline for Ticket Booking Microservices System
+ * Features:
+ * - Multi-service build
+ * - Docker image build and push to Nexus
+ * - Kubernetes deployment
+ * - Automated rollback on failure
+ */
+
+pipeline {
+    agent any
+
+    environment {
+        // Nexus配置
+        NEXUS_URL = 'nexus.example.com'
+        NEXUS_REPO = 'ticket-system'
+        NEXUS_CREDENTIALS = 'nexus-credentials'
+
+        // Kubernetes配置
+        K8S_NAMESPACE = 'ticket-system'
+        K8S_CREDENTIALS = 'kubernetes-credentials'
+
+        // Maven配置
+        MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
+
+        // 服务列表
+        SERVICES = 'gateway-service,auth-service,event-service,seat-service,order-service,payment-service,log-service'
+
+        // 构建信息
+        BUILD_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(8)}"
+    }
+
+    options {
+        // 保留最近10次构建
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        // 超时时间30分钟
+        timeout(time: 30, unit: 'MINUTES')
+        // 不允许并发构建
+        disableConcurrentBuilds()
+    }
+
+    triggers {
+        // Git推送触发
+        githubPush()
+        // 定时触发（每天凌晨2点）
+        cron('0 2 * * *')
+    }
+
+    stages {
+        stage('环境准备') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "构建环境信息"
+                    echo "=========================================="
+                    echo "分支: ${env.GIT_BRANCH}"
+                    echo "提交: ${env.GIT_COMMIT}"
+                    echo "构建号: ${env.BUILD_NUMBER}"
+                    echo "构建标签: ${BUILD_TAG}"
+                    echo "=========================================="
+                }
+
+                // 清理工作空间
+                cleanWs()
+
+                // 检出代码
+                checkout scm
+            }
+        }
+
+        stage('代码质量检查') {
+            steps {
+                script {
+                    echo "Running code quality checks..."
+
+                    // Maven代码检查
+                    sh '''
+                        mvn clean verify sonar:sonar \
+                        -Dsonar.projectKey=ticket-system \
+                        -Dsonar.host.url=http://sonarqube.example.com \
+                        -Dsonar.login=${SONAR_TOKEN}
+                    '''
+                }
+            }
+        }
+
+        stage('单元测试') {
+            steps {
+                script {
+                    echo "Running unit tests..."
+
+                    sh 'mvn test'
+                }
+            }
+            post {
+                always {
+                    // 发布测试报告
+                    junit '**/target/surefire-reports/*.xml'
+                    // 发布覆盖率报告
+                    jacoco(
+                        execPattern: '**/target/jacoco.exec',
+                        classPattern: '**/target/classes',
+                        sourcePattern: '**/src/main/java'
+                    )
+                }
+            }
+        }
+
+        stage('Maven构建') {
+            steps {
+                script {
+                    echo "Building with Maven..."
+
+                    sh '''
+                        mvn clean package -DskipTests \
+                        -Dmaven.test.skip=true \
+                        ${MAVEN_OPTS}
+                    '''
+                }
+            }
+        }
+
+        stage('Docker构建 & 推送') {
+            parallel {
+                stage('Gateway Service') {
+                    steps {
+                        buildAndPushDocker('gateway-service')
+                    }
+                }
+                stage('Auth Service') {
+                    steps {
+                        buildAndPushDocker('auth-service')
+                    }
+                }
+                stage('Event Service') {
+                    steps {
+                        buildAndPushDocker('event-service')
+                    }
+                }
+                stage('Seat Service') {
+                    steps {
+                        buildAndPushDocker('seat-service')
+                    }
+                }
+                stage('Order Service') {
+                    steps {
+                        buildAndPushDocker('order-service')
+                    }
+                }
+                stage('Payment Service') {
+                    steps {
+                        buildAndPushDocker('payment-service')
+                    }
+                }
+                stage('Log Service') {
+                    steps {
+                        buildAndPushDocker('log-service')
+                    }
+                }
+                stage('Frontend') {
+                    steps {
+                        script {
+                            echo "Building and pushing frontend..."
+
+                            dir('frontend') {
+                                sh """
+                                    docker build -t ${NEXUS_URL}/${NEXUS_REPO}/frontend:${BUILD_TAG} \
+                                    -f ../docker/Dockerfile.frontend .
+
+                                    docker tag ${NEXUS_URL}/${NEXUS_REPO}/frontend:${BUILD_TAG} \
+                                    ${NEXUS_URL}/${NEXUS_REPO}/frontend:latest
+
+                                    docker push ${NEXUS_URL}/${NEXUS_REPO}/frontend:${BUILD_TAG}
+                                    docker push ${NEXUS_URL}/${NEXUS_REPO}/frontend:latest
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('安全扫描') {
+            steps {
+                script {
+                    echo "Scanning Docker images for vulnerabilities..."
+
+                    SERVICES.split(',').each { service ->
+                        sh """
+                            trivy image --severity HIGH,CRITICAL \
+                            ${NEXUS_URL}/${NEXUS_REPO}/${service}:${BUILD_TAG}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('部署到Kubernetes') {
+            steps {
+                script {
+                    echo "Deploying to Kubernetes..."
+
+                    withKubeConfig([credentialsId: K8S_CREDENTIALS]) {
+                        // 创建namespace（如果不存在）
+                        sh "kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -"
+
+                        // 部署基础设施（首次部署）
+                        sh """
+                            kubectl apply -f k8s/mysql-deployment.yaml
+                            kubectl apply -f k8s/mongodb-deployment.yaml
+                            kubectl apply -f k8s/redis-deployment.yaml
+                            kubectl apply -f k8s/nacos-deployment.yaml
+                        """
+
+                        // 等待基础设施就绪
+                        sh """
+                            kubectl wait --for=condition=ready pod \
+                            -l app=mysql -n ${K8S_NAMESPACE} --timeout=300s || true
+                            kubectl wait --for=condition=ready pod \
+                            -l app=mongodb -n ${K8S_NAMESPACE} --timeout=300s || true
+                        """
+
+                        // 部署微服务
+                        SERVICES.split(',').each { service ->
+                            sh """
+                                # 更新镜像标签
+                                kubectl set image deployment/${service} \
+                                ${service}=${NEXUS_URL}/${NEXUS_REPO}/${service}:${BUILD_TAG} \
+                                -n ${K8S_NAMESPACE}
+
+                                # 或者apply整个配置
+                                # kubectl apply -f k8s/${service}-deployment.yaml
+                            """
+                        }
+
+                        // 部署Ingress
+                        sh "kubectl apply -f k8s/ingress.yaml"
+                    }
+                }
+            }
+        }
+
+        stage('健康检查') {
+            steps {
+                script {
+                    echo "Performing health checks..."
+
+                    withKubeConfig([credentialsId: K8S_CREDENTIALS]) {
+                        SERVICES.split(',').each { service ->
+                            sh """
+                                # 等待Deployment就绪
+                                kubectl rollout status deployment/${service} \
+                                -n ${K8S_NAMESPACE} --timeout=5m
+
+                                # 检查Pod状态
+                                kubectl get pods -l app=${service} -n ${K8S_NAMESPACE}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('集成测试') {
+            steps {
+                script {
+                    echo "Running integration tests..."
+
+                    // 运行集成测试
+                    sh '''
+                        mvn verify -Pintegration-test \
+                        -Dtest.api.url=http://api.ticket.example.com
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                echo "=========================================="
+                echo "🎉 部署成功！"
+                echo "=========================================="
+                echo "前端地址: https://ticket.example.com"
+                echo "API地址: https://api.ticket.example.com"
+                echo "构建标签: ${BUILD_TAG}"
+                echo "=========================================="
+
+                // 发送成功通知
+                sendNotification('SUCCESS')
+            }
+        }
+
+        failure {
+            script {
+                echo "=========================================="
+                echo "❌ 部署失败！"
+                echo "=========================================="
+
+                // 自动回滚
+                withKubeConfig([credentialsId: K8S_CREDENTIALS]) {
+                    SERVICES.split(',').each { service ->
+                        sh """
+                            echo "回滚 ${service}..."
+                            kubectl rollout undo deployment/${service} -n ${K8S_NAMESPACE}
+                        """
+                    }
+                }
+
+                // 发送失败通知
+                sendNotification('FAILURE')
+            }
+        }
+
+        always {
+            // 清理Docker镜像
+            sh '''
+                docker system prune -f
+            '''
+
+            // 归档构建产物
+            archiveArtifacts artifacts: '**/target/*.jar', allowEmptyArchive: true
+
+            // 清理工作空间
+            cleanWs()
+        }
+    }
+}
+
+/**
+ * 构建并推送Docker镜像
+ */
+def buildAndPushDocker(String service) {
+    script {
+        echo "Building ${service}..."
+
+        dir(service) {
+            sh """
+                docker build -t ${NEXUS_URL}/${NEXUS_REPO}/${service}:${BUILD_TAG} \
+                -f ../docker/Dockerfile.backend .
+
+                docker tag ${NEXUS_URL}/${NEXUS_REPO}/${service}:${BUILD_TAG} \
+                ${NEXUS_URL}/${NEXUS_REPO}/${service}:latest
+
+                docker push ${NEXUS_URL}/${NEXUS_REPO}/${service}:${BUILD_TAG}
+                docker push ${NEXUS_URL}/${NEXUS_REPO}/${service}:latest
+            """
+        }
+    }
+}
+
+/**
+ * 发送通知（钉钉/邮件/Slack）
+ */
+def sendNotification(String status) {
+    def color = status == 'SUCCESS' ? 'good' : 'danger'
+    def emoji = status == 'SUCCESS' ? '✅' : '❌'
+
+    // 钉钉通知
+    sh """
+        curl -X POST 'https://oapi.dingtalk.com/robot/send?access_token=${DINGTALK_TOKEN}' \
+        -H 'Content-Type: application/json' \
+        -d '{
+            "msgtype": "markdown",
+            "markdown": {
+                "title": "构建通知",
+                "text": "### ${emoji} 构建${status}\\n\\n" +
+                        "- **项目**: Ticket System\\n" +
+                        "- **分支**: ${env.GIT_BRANCH}\\n" +
+                        "- **构建号**: ${env.BUILD_NUMBER}\\n" +
+                        "- **标签**: ${BUILD_TAG}\\n" +
+                        "- **链接**: ${env.BUILD_URL}"
+            }
+        }'
+    '''
+}
