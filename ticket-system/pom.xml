@@ -13,39 +13,86 @@
     <name>Ticket Booking Microservices System (MySQL + MongoDB)</name>
     <description>Enterprise-level Microservices Ticket Booking Platform with Hybrid Database</description>
 
+    <!--
+        微服务模块列表
+
+        架构说明：
+        1. common-utils - 公共工具模块（Redis工具、JWT工具、通用响应等）
+        2. gateway-service - API网关（统一入口、路由转发、JWT认证、限流）
+        3. auth-service - 认证服务（登录、注册、JWT生成、Token管理）- MySQL
+        4. user-service - 用户服务（用户信息管理、个人资料）- MySQL
+        5. event-service - 节目服务（节目信息、搜索、推荐）- MongoDB
+        6. seat-service - 座位服务（座位状态、锁定/解锁、防超卖）- MySQL + MongoDB + Redis
+        7. order-service - 订单服务（订单创建、状态管理）- MySQL
+        8. payment-service - 支付服务（支付处理、订单回调）- MySQL
+        9. log-service - 日志服务（操作日志、审计日志）- MongoDB
+
+        数据库选型：
+        - MySQL：存储强一致性数据（订单、支付、座位状态等）
+        - MongoDB：存储灵活数据（节目信息、日志、座位布局等）
+        - Redis：缓存、分布式锁、防超卖
+    -->
     <modules>
-        <module>common-utils</module>
-        <module>gateway-service</module>
-        <module>auth-service</module>
-        <module>user-service</module>
-        <module>event-service</module>
-        <module>seat-service</module>
-        <module>order-service</module>
-        <module>payment-service</module>
-        <module>log-service</module>
+        <module>common-utils</module>      <!-- 公共工具模块 -->
+        <module>gateway-service</module>   <!-- API网关 -->
+        <module>auth-service</module>      <!-- 认证服务 - MySQL -->
+        <module>user-service</module>      <!-- 用户服务 - MySQL -->
+        <module>event-service</module>     <!-- 节目服务 - MongoDB -->
+        <module>seat-service</module>      <!-- 座位服务 - MySQL + MongoDB + Redis -->
+        <module>order-service</module>     <!-- 订单服务 - MySQL -->
+        <module>payment-service</module>   <!-- 支付服务 - MySQL -->
+        <module>log-service</module>       <!-- 日志服务 - MongoDB -->
     </modules>
 
+    <!--
+        版本管理
+
+        技术栈版本说明：
+        - Java 17：LTS长期支持版本，性能优秀
+        - Spring Boot 3.1.5：最新稳定版，支持Java 17+
+        - Spring Cloud 2022.0.4：微服务全家桶
+        - Spring Cloud Alibaba 2022.0.0.0：阿里云微服务套件（Nacos、Sentinel）
+        - MySQL 8.0.33：最新稳定版，支持JSON字段、窗口函数等
+        - MongoDB 3.1.5：NoSQL数据库，适合存储灵活数据
+        - Redis：通过Spring Boot Starter集成
+    -->
     <properties>
+        <!-- JDK版本：使用Java 17 LTS -->
         <java.version>17</java.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <spring-boot.version>3.1.5</spring-boot.version>
-        <spring-cloud.version>2022.0.4</spring-cloud.version>
-        <spring-cloud-alibaba.version>2022.0.0.0</spring-cloud-alibaba.version>
+        <!-- Spring框架版本 -->
+        <spring-boot.version>3.1.5</spring-boot.version>          <!-- Spring Boot核心 -->
+        <spring-cloud.version>2022.0.4</spring-cloud.version>     <!-- Spring Cloud微服务 -->
+        <spring-cloud-alibaba.version>2022.0.0.0</spring-cloud-alibaba.version>  <!-- 阿里云微服务 -->
 
-        <mysql.version>8.0.33</mysql.version>
-        <mongodb.version>3.1.5</mongodb.version>
-        <lombok.version>1.18.30</lombok.version>
-        <mapstruct.version>1.5.5.Final</mapstruct.version>
-        <jwt.version>0.11.5</jwt.version>
-        <springdoc.version>2.2.0</springdoc.version>
+        <!-- 数据库版本 -->
+        <mysql.version>8.0.33</mysql.version>       <!-- MySQL驱动 -->
+        <mongodb.version>3.1.5</mongodb.version>    <!-- MongoDB驱动 -->
+
+        <!-- 工具库版本 -->
+        <lombok.version>1.18.30</lombok.version>              <!-- Lombok：简化Java代码 -->
+        <mapstruct.version>1.5.5.Final</mapstruct.version>    <!-- MapStruct：对象映射 -->
+        <jwt.version>0.11.5</jwt.version>                     <!-- JWT：JSON Web Token -->
+        <springdoc.version>2.2.0</springdoc.version>          <!-- Swagger/OpenAPI文档 -->
     </properties>
 
+    <!--
+        依赖管理
+
+        说明：
+        - dependencyManagement：统一管理所有子模块的依赖版本
+        - 子模块只需声明依赖，无需指定版本号
+        - 确保所有模块使用相同版本的依赖，避免版本冲突
+    -->
     <dependencyManagement>
         <dependencies>
-            <!-- Spring Boot -->
+            <!--
+                Spring Boot核心依赖
+                包含：Web、JPA、Redis、Validation等常用依赖
+            -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
@@ -54,7 +101,10 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- Spring Cloud -->
+            <!--
+                Spring Cloud微服务依赖
+                包含：Gateway、OpenFeign、LoadBalancer、Config等
+            -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
@@ -63,7 +113,10 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- Spring Cloud Alibaba -->
+            <!--
+                Spring Cloud Alibaba依赖
+                包含：Nacos（服务注册与配置中心）、Sentinel（限流熔断）
+            -->
             <dependency>
                 <groupId>com.alibaba.cloud</groupId>
                 <artifactId>spring-cloud-alibaba-dependencies</artifactId>
@@ -72,28 +125,42 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- MySQL -->
+            <!--
+                MySQL驱动
+                用于：订单服务、支付服务、座位服务等需要强一致性的数据存储
+            -->
             <dependency>
                 <groupId>com.mysql</groupId>
                 <artifactId>mysql-connector-j</artifactId>
                 <version>${mysql.version}</version>
             </dependency>
 
-            <!-- MongoDB -->
+            <!--
+                MongoDB驱动
+                用于：节目服务、日志服务等需要灵活Schema的数据存储
+            -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-data-mongodb</artifactId>
                 <version>${mongodb.version}</version>
             </dependency>
 
-            <!-- Lombok -->
+            <!--
+                Lombok - 简化Java代码
+                功能：@Data、@Getter、@Setter、@Builder等注解
+                优点：减少样板代码，提高开发效率
+            -->
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
             </dependency>
 
-            <!-- MapStruct -->
+            <!--
+                MapStruct - 对象映射工具
+                功能：自动生成DTO与Entity之间的转换代码
+                优点：编译时生成，性能优于反射，类型安全
+            -->
             <dependency>
                 <groupId>org.mapstruct</groupId>
                 <artifactId>mapstruct</artifactId>
@@ -105,7 +172,11 @@
                 <version>${mapstruct.version}</version>
             </dependency>
 
-            <!-- JWT -->
+            <!--
+                JWT (JSON Web Token) - 身份认证
+                功能：生成和验证JWT Token
+                用于：用户登录认证、API网关Token验证
+            -->
             <dependency>
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-api</artifactId>
@@ -122,14 +193,21 @@
                 <version>${jwt.version}</version>
             </dependency>
 
-            <!-- Swagger/OpenAPI -->
+            <!--
+                Swagger/OpenAPI - API文档
+                功能：自动生成API文档，提供Swagger UI界面
+                访问：http://localhost:8080/swagger-ui.html
+            -->
             <dependency>
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${springdoc.version}</version>
             </dependency>
 
-            <!-- Common Utils -->
+            <!--
+                公共工具模块
+                包含：RedisUtil、JwtUtil、统一响应、全局异常处理等
+            -->
             <dependency>
                 <groupId>com.ticket</groupId>
                 <artifactId>common-utils</artifactId>
